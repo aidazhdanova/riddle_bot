@@ -23,7 +23,11 @@ class RiddleMasterBot:
             "Идешь, идешь, а конца не найдешь": "Земной шар",
             "Какие 2 ноты обозначают съедобный продукт?": "Фа-соль",
             "Без рук, без ног, А рисовать умеет": "Мороз",
+            "На дворе горой, а в избе водой": "Снег",
+            "Какой конь не ест овса?": "Шахматный",
+            "В каком слове 3 буквы л и три буквы п?": "Параллелепипед",
         }
+        
         self.user_data = {}
 
         self.bot.message_handler(commands=['start'])(self.start)
@@ -31,8 +35,9 @@ class RiddleMasterBot:
         self.bot.message_handler(func=lambda message: message.text.lower() == "еще")(self.send_riddle)
         self.bot.message_handler(content_types=['text'])(self.process_riddle)
         self.bot.callback_query_handler(func=lambda call: call.data == "start_riddle")(self.callback_start_riddle)
+        self.bot.callback_query_handler(func=lambda call: call.data == "next_riddle")(self.callback_button)
 
-        # Создание случайного порядка загадок
+
         self.random_riddle_order = list(self.riddles.keys())
         random.shuffle(self.random_riddle_order)
 
@@ -40,12 +45,16 @@ class RiddleMasterBot:
         """Обработчик команды /start."""
         self.user_data[message.chat.id] = {"current_riddle": None}
         markup = telebot.types.InlineKeyboardMarkup()
-        start_button = telebot.types.InlineKeyboardButton("Хочу загадку", callback_data="start_riddle")
+        start_button = telebot.types.InlineKeyboardButton(
+            "Хочу загадку", 
+            callback_data="start_riddle"
+        )
         markup.add(start_button)
         self.bot.send_message(
             message.chat.id,
             "Привет! Я бот-загадочник. Поиграем?",
-            reply_markup=markup)
+            reply_markup=markup
+        )
 
     def send_riddle(self, message):
         """Отправка пользователю загадки."""
@@ -58,7 +67,14 @@ class RiddleMasterBot:
         riddle = self.random_riddle_order.pop()
         self.user_data[message.chat.id]["current_riddle"] = riddle
 
-        self.bot.send_message(message.chat.id, riddle)
+        markup = telebot.types.InlineKeyboardMarkup()
+        next_riddle_button = telebot.types.InlineKeyboardButton(
+            "Следующая загадка",
+            callback_data="next_riddle"
+            )
+        markup.add(next_riddle_button)
+
+        self.bot.send_message(message.chat.id, riddle, reply_markup=markup)
 
     def process_riddle(self, message):
         """Обработка ответа пользователя на загадку."""
@@ -70,7 +86,6 @@ class RiddleMasterBot:
         expected_answer = self.riddles[riddle].lower()
 
         user_answer = re.sub(r'[^\w\s]', '', message.text.lower())
-        # Удаляем все символы
 
         user_words = set(user_answer.split())
         expected_words = set(expected_answer.split())
@@ -81,13 +96,27 @@ class RiddleMasterBot:
         else:
             self.bot.send_message(message.chat.id,
                                   f"Неправильно. Правильный ответ: {expected_answer}")
+
+            markup = telebot.types.InlineKeyboardMarkup()
+            next_riddle_button = telebot.types.InlineKeyboardButton(
+                "Следующая загадка", 
+                callback_data="next_riddle")
+            markup.add(next_riddle_button)
+
             self.bot.send_message(
-                message.chat.id,
-                "Напишите 'Загадка', чтобы получить новую загадку.")
+                message.chat.id, 
+                "Попробуйте следующую загадку:",
+                reply_markup=markup
+            )
 
     def callback_start_riddle(self, call):
         """Обработчик коллбэка для начала новой загадки."""
         self.send_riddle(call.message)
+
+    def callback_button(self, call):
+        """Обработчик коллбэка для кнопок в Inline Key."""
+        if call.data == "next_riddle":
+            self.send_riddle(call.message)
 
     def start_polling(self):
         """Запуск бота в режиме ожидания новых сообщений."""
